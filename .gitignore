@@ -1,160 +1,91 @@
-# Byte-compiled / optimized / DLL files
-__pycache__/
-*.py[cod]
-*$py.class
+# Import necessary libraries
+import face_recognition
+import cv2
+import numpy as np
+import csv
+from datetime import datetime
 
-# C extensions
-*.so
+# Load images and encodings for known faces
+# Replace "Photos/ajay.jpg" with the path to the image file
+ajay_image = face_recognition.load_image_file("Photos/ajay.jpg")
+ajay_encoding = face_recognition.face_encodings(ajay_image)[0]
 
-# Distribution / packaging
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-share/python-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
+# Repeat the same process for other known faces
+# Replace "Photos/sakshi.jpg" with the path to the image file
+sakshi_image = face_recognition.load_image_file("Photos/sakshi.jpg")
+sakshi_encoding = face_recognition.face_encodings(sakshi_image)[0]
 
-# PyInstaller
-#  Usually these files are written by a python script from a template
-#  before PyInstaller builds the exe, so as to inject date/other infos into it.
-*.manifest
-*.spec
+# Replace "Photos/arya.jpg" with the path to the image file
+arya_image = face_recognition.load_image_file("Photos/arya.jpg")
+arya_encoding = face_recognition.face_encodings(arya_image)[0]
 
-# Installer logs
-pip-log.txt
-pip-delete-this-directory.txt
+# Create lists of known face encodings and names
+known_face_encodings = [ajay_encoding, sakshi_encoding, arya_encoding]
+known_face_names = ["ajay", "sakshi", "arya"]
 
-# Unit test / coverage reports
-htmlcov/
-.tox/
-.nox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-*.py,cover
-.hypothesis/
-.pytest_cache/
-cover/
+# Create a copy of known face names to track attendance
+students = known_face_names.copy()
 
-# Translations
-*.mo
-*.pot
+# Initialize video capture from default camera
+video_capture = cv2.VideoCapture(0)
 
-# Django stuff:
-*.log
-local_settings.py
-db.sqlite3
-db.sqlite3-journal
+# Create a CSV file for attendance logging with current date and time
+now = datetime.now()
+current_date = now.strftime("%Y-%m-%d_%H-%M-%S")
+csv_filename = current_date + '_attendance.csv'
 
-# Flask stuff:
-instance/
-.webassets-cache
+# Open the CSV file in write mode and create a writer object
+with open(csv_filename, 'w+', newline='') as csv_file:
+    csv_writer = csv.writer(csv_file)
+    csv_writer.writerow(['Name', 'Time'])
 
-# Scrapy stuff:
-.scrapy
+    # Start an infinite loop for video capture and processing
+    while True:
+        _, frame = video_capture.read()  # Read a frame from the video capture
+        small_frame = cv2.resize(frame, (0, 0), fx=0.25, fy=0.25)  # Resize the frame
+        rgb_small_frame = small_frame[:, :, ::-1]  # Convert BGR to RGB
 
-# Sphinx documentation
-docs/_build/
+        # Detect face locations and encodings in the frame
+        face_locations = face_recognition.face_locations(rgb_small_frame)
+        face_encodings = face_recognition.face_encodings(rgb_small_frame, face_locations)
 
-# PyBuilder
-.pybuilder/
-target/
+        face_names = []  # Initialize list to store recognized face names
+        # Iterate through detected face encodings
+        for face_encoding in face_encodings:
+            matches = face_recognition.compare_faces(known_face_encodings, face_encoding)
+            name = "Unknown"
 
-# Jupyter Notebook
-.ipynb_checkpoints
+            # If a match is found, assign the corresponding name
+            if True in matches:
+                first_match_index = matches.index(True)
+                name = known_face_names[first_match_index]
 
-# IPython
-profile_default/
-ipython_config.py
+            face_names.append(name)  # Append the recognized name to the list
 
-# pyenv
-#   For a library or package, you might want to ignore these files since the code is
-#   intended to run in multiple environments; otherwise, check them in:
-# .python-version
+            # If the recognized name is in the list of students, remove it and log the time
+            if name in students:
+                students.remove(name)
+                current_time = now.strftime("%H:%M:%S")
+                csv_writer.writerow([name, current_time])
 
-# pipenv
-#   According to pypa/pipenv#598, it is recommended to include Pipfile.lock in version control.
-#   However, in case of collaboration, if having platform-specific dependencies or dependencies
-#   having no cross-platform support, pipenv may install dependencies that don't work, or not
-#   install all needed dependencies.
-#Pipfile.lock
+        # Draw rectangles and labels around detected faces in the frame
+        for (top, right, bottom, left), name in zip(face_locations, face_names):
+            top *= 4
+            right *= 4
+            bottom *= 4
+            left *= 4
 
-# poetry
-#   Similar to Pipfile.lock, it is generally recommended to include poetry.lock in version control.
-#   This is especially recommended for binary packages to ensure reproducibility, and is more
-#   commonly ignored for libraries.
-#   https://python-poetry.org/docs/basic-usage/#commit-your-poetrylock-file-to-version-control
-#poetry.lock
+            cv2.rectangle(frame, (left, top), (right, bottom), (0, 255, 0), 2)
+            font = cv2.FONT_HERSHEY_DUPLEX
+            cv2.putText(frame, name, (left + 6, bottom - 6), font, 0.5, (255, 255, 255), 1)
 
-# pdm
-#   Similar to Pipfile.lock, it is generally recommended to include pdm.lock in version control.
-#pdm.lock
-#   pdm stores project-wide configurations in .pdm.toml, but it is recommended to not include it
-#   in version control.
-#   https://pdm.fming.dev/#use-with-ide
-.pdm.toml
+        # Display the frame with rectangles and labels
+        cv2.imshow("Attendance System", frame)
 
-# PEP 582; used by e.g. github.com/David-OConnor/pyflow and github.com/pdm-project/pdm
-__pypackages__/
+        # Check for the 'q' key press to exit the loop
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
 
-# Celery stuff
-celerybeat-schedule
-celerybeat.pid
-
-# SageMath parsed files
-*.sage.py
-
-# Environments
-.env
-.venv
-env/
-venv/
-ENV/
-env.bak/
-venv.bak/
-
-# Spyder project settings
-.spyderproject
-.spyproject
-
-# Rope project settings
-.ropeproject
-
-# mkdocs documentation
-/site
-
-# mypy
-.mypy_cache/
-.dmypy.json
-dmypy.json
-
-# Pyre type checker
-.pyre/
-
-# pytype static type analyzer
-.pytype/
-
-# Cython debug symbols
-cython_debug/
-
-# PyCharm
-#  JetBrains specific template is maintained in a separate JetBrains.gitignore that can
-#  be found at https://github.com/github/gitignore/blob/main/Global/JetBrains.gitignore
-#  and can be added to the global gitignore or merged into this file.  For a more nuclear
-#  option (not recommended) you can uncomment the following to ignore the entire idea folder.
-#.idea/
+# Release the video capture and close all OpenCV windows
+video_capture.release()
+cv2.destroyAllWindows()
